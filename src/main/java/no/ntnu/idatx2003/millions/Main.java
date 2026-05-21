@@ -8,6 +8,13 @@ import javafx.application.Application;
  */
 public class Main {
     /**
+     * Constructs the application entry point.
+     */
+    public Main() {
+        // Default constructor.
+    }
+
+    /**
      * Main method - entry point for the application.
      *
      * @param args command-line arguments
@@ -16,4 +23,3 @@ public class Main {
         Application.launch(App.class, args);
     }
 }
-

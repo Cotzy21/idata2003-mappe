@@ -14,6 +14,7 @@ import javafx.scene.control.SplitPane;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
+import javafx.scene.control.TextInputDialog;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -22,8 +23,11 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import no.ntnu.idatx2003.millions.io.StockCsvReader;
-import no.ntnu.idatx2003.millions.io.StockCsvWriter;
+import no.ntnu.idatx2003.millions.exception.InvalidStockDataException;
+import no.ntnu.idatx2003.millions.io.CsvStockReader;
+import no.ntnu.idatx2003.millions.io.CsvStockWriter;
+import no.ntnu.idatx2003.millions.io.StockDataReader;
+import no.ntnu.idatx2003.millions.io.StockDataWriter;
 import no.ntnu.idatx2003.millions.model.Exchange;
 import no.ntnu.idatx2003.millions.model.Player;
 import no.ntnu.idatx2003.millions.model.Share;
@@ -33,28 +37,38 @@ import no.ntnu.idatx2003.millions.model.transaction.Transaction;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.Reader;
+import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * JavaFX Application class for the Millions stock trading game.
  */
 public class App extends Application {
-    private static final BigDecimal STARTING_MONEY = new BigDecimal("100000.00");
+    private static final BigDecimal DEFAULT_STARTING_MONEY = new BigDecimal("100000.00");
+    private final StockDataReader stockDataReader = new CsvStockReader();
+    private final StockDataWriter stockDataWriter = new CsvStockWriter();
 
+    private BigDecimal startingMoney = DEFAULT_STARTING_MONEY;
     private Exchange exchange;
     private Player player;
 
     private final ObservableList<Stock> stockRows = FXCollections.observableArrayList();
     private final ObservableList<Share> shareRows = FXCollections.observableArrayList();
     private final ObservableList<Transaction> transactionRows = FXCollections.observableArrayList();
+    private final ObservableList<PricePoint> priceHistoryRows = FXCollections.observableArrayList();
 
     private TableView<Stock> stockTable;
     private TableView<Share> portfolioTable;
     private TableView<Transaction> transactionTable;
+    private TableView<PricePoint> priceHistoryTable;
 
     private TextField quantityField;
     private Label weekLabel;
@@ -82,7 +96,7 @@ public class App extends Application {
     @Override
     public void start(Stage stage) {
         this.exchange = new Exchange("Millions Exchange", createDefaultStocks());
-        this.player = new Player("Player", STARTING_MONEY);
+        this.player = new Player("Player", startingMoney);
 
         BorderPane root = new BorderPane();
         root.setTop(createHeader());
@@ -138,15 +152,18 @@ public class App extends Application {
         stockTable = createStockTable();
         portfolioTable = createPortfolioTable();
         transactionTable = createTransactionTable();
+        priceHistoryTable = createPriceHistoryTable();
 
         VBox marketPane = new VBox(10, sectionTitle("Exchange"), stockTable, createTradeControls());
         marketPane.setPadding(new Insets(18));
         VBox.setVgrow(stockTable, Priority.ALWAYS);
 
         VBox portfolioPane = new VBox(10, sectionTitle("Portfolio"), portfolioTable,
+                sectionTitle("Selected stock history"), priceHistoryTable,
                 sectionTitle("Transactions"), transactionTable);
         portfolioPane.setPadding(new Insets(18));
         VBox.setVgrow(portfolioTable, Priority.ALWAYS);
+        VBox.setVgrow(priceHistoryTable, Priority.ALWAYS);
         VBox.setVgrow(transactionTable, Priority.ALWAYS);
 
         SplitPane splitPane = new SplitPane(marketPane, portfolioPane);
@@ -181,13 +198,31 @@ public class App extends Application {
         TableColumn<Share, String> company = column("Company", share -> share.getStock().getCompany(), 0.30);
         TableColumn<Share, String> quantity = column("Qty", share -> formatQuantity(share.getQuantity()), 0.12);
         TableColumn<Share, String> purchase = column("Bought", share -> formatMoney(share.getPurchasePrice()), 0.14);
-        TableColumn<Share, String> current = column("Current", share -> formatMoney(share.getStock().getSalesPrice()), 0.14);
+        TableColumn<Share, String> current = column("Current", share -> formatMoney(share.getStock().getSalesPrice()), 0.13);
         TableColumn<Share, String> saleValue = column("Sale value",
-                share -> formatMoney(new SaleCalculator(share).calculateTotal()), 0.14);
+                share -> formatMoney(new SaleCalculator(share).calculateTotal()), 0.13);
+        TableColumn<Share, String> profitLoss = column("P/L",
+                share -> formatSignedMoney(calculateProfitLoss(share)), 0.12);
 
-        table.getColumns().setAll(List.of(symbol, company, quantity, purchase, current, saleValue));
+        table.getColumns().setAll(List.of(symbol, company, quantity, purchase, current, saleValue, profitLoss));
         table.getSelectionModel().selectedItemProperty().addListener(
                 (observable, oldShare, newShare) -> updateSelectedShare(newShare));
+        return table;
+    }
+
+    private TableView<PricePoint> createPriceHistoryTable() {
+        TableView<PricePoint> table = new TableView<>(priceHistoryRows);
+        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
+        table.setPlaceholder(new Label("Select a stock to see price history"));
+
+        TableColumn<PricePoint, String> week = column("Week",
+                point -> Integer.toString(point.week()), 0.20);
+        TableColumn<PricePoint, String> price = column("Price",
+                point -> formatMoney(point.price()), 0.40);
+        TableColumn<PricePoint, String> change = column("Change",
+                point -> formatSignedMoney(point.change()), 0.40);
+
+        table.getColumns().setAll(List.of(week, price, change));
         return table;
     }
 
@@ -237,8 +272,8 @@ public class App extends Application {
         Button saveCsvButton = new Button("Save CSV");
         saveCsvButton.setOnAction(event -> saveStocksToCsv());
 
-        Button resetButton = new Button("Reset");
-        resetButton.setOnAction(event -> resetGame(createDefaultStocks(), "Game reset."));
+        Button resetButton = new Button("New game");
+        resetButton.setOnAction(event -> newGameWithPrompt());
 
         marketStatsLabel = new Label();
         marketStatsLabel.setTextFill(Color.web("#4f5865"));
@@ -269,6 +304,30 @@ public class App extends Application {
         return statusLine;
     }
 
+    private void newGameWithPrompt() {
+        TextInputDialog dialog = new TextInputDialog(formatMoney(startingMoney));
+        dialog.setTitle("New game");
+        dialog.setHeaderText("Start a new game");
+        dialog.setContentText("Starting money:");
+
+        Optional<String> result = dialog.showAndWait();
+        if (result.isEmpty()) {
+            return;
+        }
+
+        try {
+            BigDecimal newStartingMoney = new BigDecimal(result.get().trim());
+            if (newStartingMoney.compareTo(BigDecimal.ZERO) < 0) {
+                showMessage("Starting money must be non-negative.", true);
+                return;
+            }
+            startingMoney = newStartingMoney;
+            resetGame(createDefaultStocks(), "New game started with " + formatMoney(startingMoney) + " cash.");
+        } catch (NumberFormatException exception) {
+            showMessage("Starting money must be a valid number.", true);
+        }
+    }
+
     private void loadStocksFromCsv() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.setTitle("Load stocks from CSV");
@@ -278,14 +337,14 @@ public class App extends Application {
             return;
         }
 
-        try {
-            List<Stock> stocks = StockCsvReader.readStocks(file);
+        try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
+            List<Stock> stocks = stockDataReader.read(reader);
             if (stocks.isEmpty()) {
                 showMessage("CSV file contains no stocks.", true);
                 return;
             }
             resetGame(stocks, "Loaded " + stocks.size() + " stocks from " + file.getName() + ".");
-        } catch (IOException | IllegalArgumentException exception) {
+        } catch (IOException | InvalidStockDataException exception) {
             showMessage(exception.getMessage(), true);
         }
     }
@@ -300,8 +359,8 @@ public class App extends Application {
             return;
         }
 
-        try {
-            StockCsvWriter.writeStocks(file, exchange.getAllStocks());
+        try (Writer writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
+            stockDataWriter.write(writer, exchange.getAllStocks());
             showMessage("Saved stocks to " + file.getName() + ".", false);
         } catch (IOException exception) {
             showMessage(exception.getMessage(), true);
@@ -310,7 +369,7 @@ public class App extends Application {
 
     private void resetGame(List<Stock> stocks, String message) {
         this.exchange = new Exchange("Millions Exchange", stocks);
-        this.player = new Player("Player", STARTING_MONEY);
+        this.player = new Player("Player", startingMoney);
         stockTable.getSelectionModel().clearSelection();
         portfolioTable.getSelectionModel().clearSelection();
         transactionTable.getSelectionModel().clearSelection();
@@ -432,11 +491,25 @@ public class App extends Application {
         }
         if (stock == null) {
             selectedStockLabel.setText("Select a stock to buy.");
+            priceHistoryRows.clear();
             return;
         }
         selectedStockLabel.setText(stock.getSymbol() + " " + stock.getCompany()
                 + " | price " + formatMoney(stock.getSalesPrice())
-                + " | latest change " + formatSignedMoney(stock.getLatestPriceChange()));
+                + " | latest change " + formatSignedMoney(stock.getLatestPriceChange())
+                + " | high " + formatMoney(stock.getHighestPrice())
+                + " | low " + formatMoney(stock.getLowestPrice()));
+        priceHistoryRows.setAll(createPricePoints(stock));
+    }
+
+    private List<PricePoint> createPricePoints(Stock stock) {
+        List<BigDecimal> prices = stock.getHistoricalPrices();
+        List<PricePoint> points = new ArrayList<>();
+        for (int index = 0; index < prices.size(); index++) {
+            BigDecimal previous = index == 0 ? prices.get(index) : prices.get(index - 1);
+            points.add(new PricePoint(index + 1, prices.get(index), prices.get(index).subtract(previous)));
+        }
+        return points.reversed();
     }
 
     private void updateSelectedShare(Share share) {
@@ -476,6 +549,12 @@ public class App extends Application {
         return column;
     }
 
+    private static BigDecimal calculateProfitLoss(Share share) {
+        BigDecimal saleValue = new SaleCalculator(share).calculateTotal();
+        BigDecimal purchaseCost = share.getPurchasePrice().multiply(share.getQuantity());
+        return saleValue.subtract(purchaseCost);
+    }
+
     private static String formatMoney(BigDecimal amount) {
         return amount.setScale(2, RoundingMode.HALF_UP).toPlainString();
     }
@@ -502,6 +581,9 @@ public class App extends Application {
                 new Stock("TOM", "Tomra Systems", new BigDecimal("142.20")),
                 new Stock("YAR", "Yara International", new BigDecimal("337.70"))
         );
+    }
+
+    private record PricePoint(int week, BigDecimal price, BigDecimal change) {
     }
 
     @FunctionalInterface

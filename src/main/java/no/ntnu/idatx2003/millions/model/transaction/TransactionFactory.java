@@ -1,8 +1,8 @@
 package no.ntnu.idatx2003.millions.model.transaction;
 
-import no.ntnu.idatx2003.millions.model.Share;
-
 import java.math.BigDecimal;
+import java.util.Objects;
+import no.ntnu.idatx2003.millions.model.Share;
 
 /**
  * Factory for creating transaction objects.
@@ -41,7 +41,7 @@ public class TransactionFactory {
     }
 
     /**
-     * Creates a Sale transaction for a specified quantity of a portfolio share.
+     * Creates a Sale transaction for part of an existing portfolio share.
      *
      * @param portfolioShare the Share currently held in the portfolio
      * @param quantity the quantity to sell
@@ -49,14 +49,13 @@ public class TransactionFactory {
      * @return a new Sale transaction
      */
     public static Sale createSale(Share portfolioShare, BigDecimal quantity, int week) {
-        if (portfolioShare == null) {
-            throw new IllegalArgumentException("Portfolio share cannot be null");
-        }
-        if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Sale quantity must be positive");
+        Objects.requireNonNull(portfolioShare, "portfolioShare must not be null");
+        Objects.requireNonNull(quantity, "quantity must not be null");
+        if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Quantity must be positive");
         }
         if (quantity.compareTo(portfolioShare.getQuantity()) > 0) {
-            throw new IllegalArgumentException("Cannot sell more shares than the portfolio contains");
+            throw new IllegalArgumentException("Quantity cannot exceed owned shares");
         }
 
         Share saleShare = new Share(

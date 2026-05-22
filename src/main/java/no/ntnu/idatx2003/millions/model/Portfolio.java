@@ -1,5 +1,7 @@
 package no.ntnu.idatx2003.millions.model;
 
+import no.ntnu.idatx2003.millions.model.transaction.SaleCalculator;
+
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -86,7 +88,7 @@ public class Portfolio {
      */
     public BigDecimal getNetWorth() {
         return shares.stream()
-                .map(share -> share.getStock().getSalesPrice().multiply(share.getQuantity()))
+                .map(share -> new SaleCalculator(share).calculateTotal())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
@@ -96,4 +98,3 @@ public class Portfolio {
                 shares.size(), getNetWorth());
     }
 }
-

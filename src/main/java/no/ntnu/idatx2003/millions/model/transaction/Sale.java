@@ -35,6 +35,12 @@ public class Sale extends Transaction {
      */
     public Sale(Share share, Share portfolioShare, int week, TransactionCalculator calculator) {
         super(share, week, calculator);
+        if (portfolioShare == null) {
+            throw new IllegalArgumentException("Portfolio share cannot be null");
+        }
+        if (share.getQuantity().compareTo(portfolioShare.getQuantity()) > 0) {
+            throw new IllegalArgumentException("Cannot sell more shares than the portfolio contains");
+        }
         this.portfolioShare = portfolioShare;
     }
 

@@ -148,6 +148,7 @@ public class MainController implements MainView.Actions {
 
     private void resetGame(List<Stock> stocks, String message) {
         session.reset(stocks);
+        session.exchange().addObserver(exchange -> refreshAll());
         view.clearSelections();
         refreshAll();
         view.showMessage(message, false);

@@ -3,6 +3,8 @@ package no.ntnu.idatx2003.millions.model;
 import no.ntnu.idatx2003.millions.exception.StockNotFoundException;
 import no.ntnu.idatx2003.millions.model.transaction.Transaction;
 import no.ntnu.idatx2003.millions.model.transaction.TransactionFactory;
+import no.ntnu.idatx2003.millions.observer.Observable;
+import no.ntnu.idatx2003.millions.observer.Observer;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -10,6 +12,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Random;
 import java.util.stream.Collectors;
 
@@ -17,11 +20,12 @@ import java.util.stream.Collectors;
  * Represents a stock exchange.
  * Manages available stocks, week tracking, and price updates.
  */
-public class Exchange {
+public class Exchange implements Observable<Exchange> {
     private final String name;
     private int week;
     private final Map<String, Stock> stockMap;
     private final Random random;
+    private final List<Observer<Exchange>> observers;
 
     /**
      * Constructs an Exchange with initial stocks.
@@ -41,6 +45,7 @@ public class Exchange {
         this.week = 1;
         this.stockMap = new HashMap<>();
         this.random = new Random();
+        this.observers = new ArrayList<>();
 
         for (Stock stock : stocks) {
             if (stock != null) {
@@ -164,22 +169,55 @@ public class Exchange {
      */
     public void advance() {
         week++;
+        stockMap.values().forEach(this::updatePriceFor);
+        notifyObservers();
+    }
 
-        for (Stock stock : stockMap.values()) {
-            BigDecimal currentPrice = stock.getSalesPrice();
+    /**
+     * Adds an observer that is notified when the exchange changes.
+     *
+     * @param observer the observer to add; must not be {@code null}
+     * @return {@code true} if the observer was added
+     */
+    @Override
+    public boolean addObserver(Observer<Exchange> observer) {
+        Objects.requireNonNull(observer, "observer must not be null");
+        return observers.add(observer);
+    }
 
-            int basisPoints = random.nextInt(2001) - 1000;
-            BigDecimal multiplier = BigDecimal.ONE.add(
-                    BigDecimal.valueOf(basisPoints).movePointLeft(4));
+    /**
+     * Removes an observer.
+     *
+     * @param observer the observer to remove; must not be {@code null}
+     * @return {@code true} if the observer was removed
+     */
+    @Override
+    public boolean removeObserver(Observer<Exchange> observer) {
+        Objects.requireNonNull(observer, "observer must not be null");
+        return observers.remove(observer);
+    }
 
-            BigDecimal newPrice = currentPrice.multiply(multiplier)
-                    .setScale(2, RoundingMode.HALF_UP);
+    /**
+     * Notifies all registered observers about an exchange update.
+     */
+    @Override
+    public void notifyObservers() {
+        List.copyOf(observers).forEach(observer -> observer.update(this));
+    }
 
-            if (newPrice.compareTo(BigDecimal.ZERO) < 0) {
-                newPrice = BigDecimal.ZERO;
-            }
-            stock.addNewSalesPrice(newPrice);
+    private void updatePriceFor(Stock stock) {
+        BigDecimal currentPrice = stock.getSalesPrice();
+        int basisPoints = random.nextInt(2001) - 1000;
+        BigDecimal multiplier = BigDecimal.ONE.add(
+                BigDecimal.valueOf(basisPoints).movePointLeft(4));
+
+        BigDecimal newPrice = currentPrice.multiply(multiplier)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if (newPrice.compareTo(BigDecimal.ZERO) < 0) {
+            newPrice = BigDecimal.ZERO;
         }
+        stock.addNewSalesPrice(newPrice);
     }
 
     /**

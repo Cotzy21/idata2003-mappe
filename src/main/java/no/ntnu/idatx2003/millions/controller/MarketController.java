@@ -70,7 +70,6 @@ public class MarketController {
     public void advanceWeek() {
         session.exchange().advance();
         view.showMessage("Advanced to week " + session.exchange().getWeek() + ".", false);
-        refreshAll.run();
     }
 
     /**

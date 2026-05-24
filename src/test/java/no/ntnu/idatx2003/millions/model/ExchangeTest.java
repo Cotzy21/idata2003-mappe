@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -129,6 +130,31 @@ class ExchangeTest {
         assertTrue(newPrice.compareTo(BigDecimal.ZERO) >= 0);
     }
 
+    @DisplayName("advance: notifies registered observers")
+    @Test
+    void advance_whenObserverIsRegistered_notifiesObserver() {
+        AtomicInteger updates = new AtomicInteger();
+        exchange.addObserver(updatedExchange -> updates.incrementAndGet());
+
+        exchange.advance();
+
+        assertEquals(1, updates.get());
+    }
+
+    @DisplayName("advance: does not notify removed observers")
+    @Test
+    void advance_whenObserverIsRemoved_doesNotNotifyObserver() {
+        AtomicInteger updates = new AtomicInteger();
+        no.ntnu.idatx2003.millions.observer.Observer<Exchange> observer =
+                updatedExchange -> updates.incrementAndGet();
+        exchange.addObserver(observer);
+        exchange.removeObserver(observer);
+
+        exchange.advance();
+
+        assertEquals(0, updates.get());
+    }
+
     @DisplayName("getGainers: returns top gainers in descending order")
     @Test
     void testGetGainers() {
@@ -196,4 +222,3 @@ class ExchangeTest {
         assertEquals(1, player.getTransactionArchive().getTransactions().size());
     }
 }
-

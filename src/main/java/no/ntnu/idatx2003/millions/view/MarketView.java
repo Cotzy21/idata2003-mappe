@@ -10,10 +10,10 @@ import javafx.scene.control.Separator;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.control.TextField;
-import javafx.scene.layout.HBox;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import no.ntnu.idatx2003.millions.model.Stock;
 
 import java.util.List;
@@ -40,6 +40,7 @@ public class MarketView {
         selectedStockLabel = mutedLabel("Select a stock to buy.");
 
         root = new VBox(10, sectionTitle("Exchange"), stockTable, createTradeControls());
+        root.getStyleClass().add("section-pane");
         root.setPadding(new Insets(18));
         VBox.setVgrow(stockTable, Priority.ALWAYS);
     }
@@ -123,6 +124,7 @@ public class MarketView {
 
     private TableView<Stock> createStockTable() {
         TableView<Stock> table = new TableView<>(stockRows);
+        table.getStyleClass().add("market-table");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("No stocks available"));
 
@@ -148,7 +150,8 @@ public class MarketView {
 
     private VBox createTradeControls() {
         quantityField.setPromptText("Quantity");
-        quantityField.setMaxWidth(140);
+        quantityField.setPrefWidth(120);
+        quantityField.setMinWidth(96);
 
         Button buyButton = actionButton("Buy selected", MainView.Actions::onBuySelectedStock);
         buyButton.setDefaultButton(true);
@@ -158,17 +161,23 @@ public class MarketView {
         Button saveCsvButton = actionButton("Save CSV", MainView.Actions::onSaveStocks);
         Button resetButton = actionButton("New game", MainView.Actions::onNewGame);
 
-        HBox actionsBox = new HBox(10, new Label("Quantity"), quantityField, buyButton, sellButton,
+        Label quantityLabel = new Label("Quantity");
+        quantityLabel.setMinWidth(Region.USE_PREF_SIZE);
+
+        FlowPane actionsBox = new FlowPane(10, 10, quantityLabel, quantityField, buyButton, sellButton,
                 nextWeekButton, loadCsvButton, saveCsvButton, resetButton);
         actionsBox.setAlignment(Pos.CENTER_LEFT);
+        actionsBox.getStyleClass().add("trade-actions");
 
         VBox box = new VBox(10, new Separator(), marketStatsLabel, selectedStockLabel, actionsBox);
+        box.getStyleClass().add("trade-panel");
         box.setPadding(new Insets(8, 0, 0, 0));
         return box;
     }
 
     private Button actionButton(String text, ActionRunner runner) {
         Button button = new Button(text);
+        button.setMinWidth(Region.USE_PREF_SIZE);
         button.setOnAction(event -> {
             if (actions != null) {
                 runner.run(actions);
@@ -179,7 +188,7 @@ public class MarketView {
 
     private static Label sectionTitle(String text) {
         Label label = new Label(text);
-        label.setStyle("-fx-font-size: 16px; -fx-font-weight: 700;");
+        label.getStyleClass().add("section-title");
         return label;
     }
 
@@ -189,7 +198,8 @@ public class MarketView {
 
     private static Label mutedLabel(String text) {
         Label label = new Label(text);
-        label.setTextFill(Color.web("#4f5865"));
+        label.getStyleClass().add("muted-label");
+        label.setWrapText(true);
         return label;
     }
 

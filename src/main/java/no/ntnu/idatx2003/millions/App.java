@@ -29,9 +29,15 @@ public class App extends Application {
         MainController controller = new MainController(view);
         controller.initialize();
 
+        Scene scene = new Scene(view.getRoot(), 1180, 760);
+        java.net.URL stylesheet = App.class.getResource("/styles/millions.css");
+        if (stylesheet != null) {
+            scene.getStylesheets().add(stylesheet.toExternalForm());
+        }
+
         stage.setTitle("Millions - Stock Trading Game");
-        stage.setScene(new Scene(view.getRoot(), 1180, 760));
-        stage.setMinWidth(980);
+        stage.setScene(scene);
+        stage.setMinWidth(840);
         stage.setMinHeight(640);
         stage.show();
     }

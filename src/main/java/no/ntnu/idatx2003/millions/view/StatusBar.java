@@ -18,12 +18,13 @@ public class StatusBar {
      */
     public StatusBar() {
         messageLabel = new Label("Ready.");
+        messageLabel.getStyleClass().add("status-message");
         messageLabel.setTextFill(Color.web("#384150"));
 
         root = new HBox(messageLabel);
+        root.getStyleClass().add("status-bar");
         root.setPadding(new Insets(10, 18, 12, 18));
         root.setAlignment(Pos.CENTER_LEFT);
-        root.setStyle("-fx-background-color: #ffffff; -fx-border-color: #dde1e7; -fx-border-width: 1 0 0 0;");
     }
 
     /**

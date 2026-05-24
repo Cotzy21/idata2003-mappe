@@ -61,7 +61,9 @@ Viktige designvalg:
 - Strategy for filhandtering: `StockDataReader` og `StockDataWriter`
 - Factory for transaksjoner: `TransactionFactory`
 - JavaFX `ObservableList` i view-laget for tabelloppdateringer
+- Eget Observer-monster for modelloppdateringer fra `Exchange`
 - `BigDecimal` for penger og kvantiteter
+- JavaFX `LineChart` for prisutvikling paa valgt aksje
 
 ## CSV-format
 

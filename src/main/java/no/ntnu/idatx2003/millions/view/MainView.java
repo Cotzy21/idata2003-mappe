@@ -33,12 +33,12 @@ public class MainView {
         statusBar = new StatusBar();
 
         root = new BorderPane();
+        root.getStyleClass().add("app-root");
         root.setTop(headerView.getRoot());
         SplitPane content = new SplitPane(marketView.getRoot(), portfolioView.getRoot());
         content.setDividerPositions(0.52);
         root.setCenter(content);
         root.setBottom(statusBar.getRoot());
-        root.setStyle("-fx-font-family: 'System'; -fx-background-color: #f6f7f9;");
     }
 
     /**

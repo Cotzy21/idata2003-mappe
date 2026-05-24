@@ -4,11 +4,11 @@ import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
 import javafx.scene.control.Separator;
-import javafx.scene.layout.GridPane;
+import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
+import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 
 import java.math.BigDecimal;
 
@@ -28,10 +28,10 @@ public class HeaderView {
      */
     public HeaderView() {
         Label title = new Label("Millions");
-        title.setStyle("-fx-font-size: 28px; -fx-font-weight: 700;");
+        title.getStyleClass().add("app-title");
 
         Label subtitle = new Label("Stock trading game");
-        subtitle.setTextFill(Color.web("#5d6673"));
+        subtitle.getStyleClass().add("app-subtitle");
 
         weekLabel = metricLabel();
         cashLabel = metricLabel();
@@ -39,13 +39,14 @@ public class HeaderView {
         netWorthLabel = metricLabel();
         statusLabel = metricLabel();
 
-        GridPane metrics = createMetrics();
+        FlowPane metrics = createMetrics();
         HBox header = new HBox(24, new VBox(2, title, subtitle), metrics);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(18, 22, 16, 22));
         HBox.setHgrow(metrics, Priority.ALWAYS);
 
         root = new VBox(header, new Separator());
+        root.getStyleClass().add("app-header");
     }
 
     /**
@@ -74,26 +75,30 @@ public class HeaderView {
         statusLabel.setText(status);
     }
 
-    private GridPane createMetrics() {
-        GridPane metrics = new GridPane();
-        metrics.setHgap(18);
-        metrics.setVgap(4);
-        metrics.add(new Label("Week"), 0, 0);
-        metrics.add(weekLabel, 0, 1);
-        metrics.add(new Label("Cash"), 1, 0);
-        metrics.add(cashLabel, 1, 1);
-        metrics.add(new Label("Portfolio"), 2, 0);
-        metrics.add(portfolioValueLabel, 2, 1);
-        metrics.add(new Label("Net worth"), 3, 0);
-        metrics.add(netWorthLabel, 3, 1);
-        metrics.add(new Label("Status"), 4, 0);
-        metrics.add(statusLabel, 4, 1);
+    private FlowPane createMetrics() {
+        FlowPane metrics = new FlowPane(22, 8);
+        metrics.setAlignment(Pos.CENTER_LEFT);
+        metrics.getChildren().addAll(
+                metricItem("Week", weekLabel),
+                metricItem("Cash", cashLabel),
+                metricItem("Portfolio", portfolioValueLabel),
+                metricItem("Net worth", netWorthLabel),
+                metricItem("Status", statusLabel));
         return metrics;
+    }
+
+    private static VBox metricItem(String name, Label valueLabel) {
+        Label nameLabel = new Label(name);
+        nameLabel.getStyleClass().add("metric-label");
+        VBox item = new VBox(3, nameLabel, valueLabel);
+        item.setMinWidth(Region.USE_PREF_SIZE);
+        return item;
     }
 
     private static Label metricLabel() {
         Label label = new Label();
-        label.setStyle("-fx-font-size: 15px; -fx-font-weight: 700;");
+        label.getStyleClass().add("metric-value");
+        label.setMinWidth(Region.USE_PREF_SIZE);
         return label;
     }
 }

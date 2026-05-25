@@ -1,9 +1,7 @@
 package no.ntnu.idatx2003.millions.model.transaction;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -96,8 +94,7 @@ public class TransactionArchive {
     public int countDistinctWeeks() {
         return (int) transactions.stream()
                 .map(Transaction::getWeek)
-                .collect(Collectors.toUnmodifiableSet())
-                .size();
+                .distinct()
+                .count();
     }
 }
-

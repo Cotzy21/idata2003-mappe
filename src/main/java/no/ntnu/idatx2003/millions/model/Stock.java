@@ -19,7 +19,7 @@ public class Stock {
      * @param symbol the stock symbol (e.g., "AAPL")
      * @param company the company name (e.g., "Apple Inc.")
      * @param initialPrice the initial sales price
-     * @throws IllegalArgumentException if symbol or company is empty, or price is negative
+     * @throws IllegalArgumentException if symbol or company is empty, or price is not positive
      */
     public Stock(String symbol, String company, BigDecimal initialPrice) {
         if (symbol == null || symbol.isBlank()) {
@@ -28,8 +28,8 @@ public class Stock {
         if (company == null || company.isBlank()) {
             throw new IllegalArgumentException("Company name cannot be null or empty");
         }
-        if (initialPrice == null || initialPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Initial price must be non-negative");
+        if (initialPrice == null || initialPrice.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Initial price must be positive");
         }
 
         this.symbol = symbol;
@@ -128,4 +128,3 @@ public class Stock {
         return String.format("%s - %s (%s)", symbol, company, getSalesPrice());
     }
 }
-

@@ -43,6 +43,12 @@ class StockTest {
                 () -> new Stock("", "Apple", new BigDecimal("150")));
     }
 
+    @Test
+    void constructor_whenSymbolIsBlank_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Stock("   ", "Apple", new BigDecimal("150")));
+    }
+
     @DisplayName("Constructor: throws exception for null company")
     @Test
     void testConstructor_nullCompany() {
@@ -55,6 +61,18 @@ class StockTest {
     void testConstructor_negativePrice() {
         assertThrows(IllegalArgumentException.class,
                 () -> new Stock("AAPL", "Apple", new BigDecimal("-10")));
+    }
+
+    @Test
+    void constructor_whenInitialPriceIsZero_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Stock("AAPL", "Apple", BigDecimal.ZERO));
+    }
+
+    @Test
+    void constructor_whenInitialPriceIsNegative_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Stock("AAPL", "Apple", new BigDecimal("-0.01")));
     }
 
     @DisplayName("getSalesPrice: returns latest price")
@@ -75,6 +93,12 @@ class StockTest {
     void testAddNewSalesPrice_negativePrice() {
         assertThrows(IllegalArgumentException.class,
                 () -> stock.addNewSalesPrice(new BigDecimal("-10")));
+    }
+
+    @Test
+    void addNewSalesPrice_whenPriceIsNegative_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> stock.addNewSalesPrice(new BigDecimal("-0.01")));
     }
 
     @DisplayName("getHistoricalPrices: returns all prices")
@@ -121,5 +145,9 @@ class StockTest {
     void testGetLatestPriceChange_singlePrice() {
         assertEquals(0, stock.getLatestPriceChange().compareTo(BigDecimal.ZERO));
     }
-}
 
+    @Test
+    void getLatestPriceChange_whenOnlyOnePrice_returnsZero() {
+        assertEquals(0, BigDecimal.ZERO.compareTo(stock.getLatestPriceChange()));
+    }
+}

@@ -31,13 +31,14 @@ class PurchaseTest {
         player = new Player("TestPlayer", new BigDecimal("5000.00"));
     }
 
-    @DisplayName("commit: successfully purchases shares when sufficient funds")
+    @DisplayName("execute: successfully purchases shares when sufficient funds")
     @Test
-    void testCommit_success() throws Exception {
+    void execute_whenSufficientFunds_completesPurchase() throws Exception {
         BigDecimal initialMoney = player.getMoney();
-        purchase.commit(player);
+        purchase.execute(player);
 
         assertTrue(purchase.isCommitted());
+        assertTrue(purchase.isExecuted());
         // Money should be deducted (1480.00 + 7.40 = 1487.40)
         BigDecimal expectedMoney = initialMoney.subtract(new BigDecimal("1487.40"));
         assertEquals(0, player.getMoney().compareTo(expectedMoney));
@@ -47,32 +48,38 @@ class PurchaseTest {
         assertEquals(1, player.getTransactionArchive().getTransactions().size());
     }
 
-    @DisplayName("commit: throws InsufficientFundsException when insufficient funds")
+    @DisplayName("execute: throws InsufficientFundsException when insufficient funds")
     @Test
-    void testCommit_insufficientFunds() {
+    void execute_whenInsufficientFunds_throwsInsufficientFundsException() {
         Player poorPlayer = new Player("PoorPlayer", new BigDecimal("100.00"));
-        assertThrows(InsufficientFundsException.class, () -> purchase.commit(poorPlayer));
+        assertThrows(InsufficientFundsException.class, () -> purchase.execute(poorPlayer));
         assertFalse(purchase.isCommitted());
     }
 
-    @DisplayName("commit: throws exception when already committed")
+    @DisplayName("execute: throws exception when already executed")
     @Test
-    void testCommit_alreadyCommitted() throws Exception {
-        purchase.commit(player);
+    void execute_whenAlreadyExecuted_throwsTransactionAlreadyCommittedException() throws Exception {
+        purchase.execute(player);
         assertThrows(TransactionAlreadyCommittedException.class,
-                () -> purchase.commit(player));
+                () -> purchase.execute(player));
     }
 
-    @DisplayName("isCommitted: returns false before commit")
+    @DisplayName("execute: throws NullPointerException when player is null")
     @Test
-    void testIsCommitted_false() {
+    void execute_whenPlayerIsNull_throwsNullPointerException() {
+        assertThrows(NullPointerException.class, () -> purchase.execute(null));
+    }
+
+    @DisplayName("isCommitted: returns false before execute")
+    @Test
+    void isCommitted_whenNotExecuted_returnsFalse() {
         assertFalse(purchase.isCommitted());
     }
 
-    @DisplayName("isCommitted: returns true after commit")
+    @DisplayName("isCommitted: returns true after execute")
     @Test
-    void testIsCommitted_true() throws Exception {
-        purchase.commit(player);
+    void isCommitted_whenExecuted_returnsTrue() throws Exception {
+        purchase.execute(player);
         assertTrue(purchase.isCommitted());
     }
 

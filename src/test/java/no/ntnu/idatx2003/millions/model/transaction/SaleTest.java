@@ -3,7 +3,7 @@ package no.ntnu.idatx2003.millions.model.transaction;
 import no.ntnu.idatx2003.millions.model.Stock;
 import no.ntnu.idatx2003.millions.model.Share;
 import no.ntnu.idatx2003.millions.model.Player;
-import no.ntnu.idatx2003.millions.exception.ShareNotInPortfolioException;
+import no.ntnu.idatx2003.millions.exception.ShareNotOwnedException;
 import no.ntnu.idatx2003.millions.exception.TransactionAlreadyCommittedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -33,13 +33,14 @@ class SaleTest {
         player.getPortfolio().addShare(share);
     }
 
-    @DisplayName("commit: successfully sells shares when present in portfolio")
+    @DisplayName("execute: successfully sells shares when present in portfolio")
     @Test
-    void testCommit_success() throws Exception {
+    void execute_whenShareOwned_completesSale() throws Exception {
         BigDecimal initialMoney = player.getMoney();
-        sale.commit(player);
+        sale.execute(player);
 
         assertTrue(sale.isCommitted());
+        assertTrue(sale.isExecuted());
         // Money should be increased (1500.00 - 15.00 - 25.50 = 1459.50)
         BigDecimal expectedMoney = initialMoney.add(new BigDecimal("1459.50"));
         assertEquals(0, player.getMoney().compareTo(expectedMoney));
@@ -49,13 +50,13 @@ class SaleTest {
         assertEquals(1, player.getTransactionArchive().getTransactions().size());
     }
 
-    @DisplayName("commit: sells partial quantity and keeps remaining shares")
+    @DisplayName("execute: sells partial quantity and keeps remaining shares")
     @Test
-    void testCommit_partialSale() throws Exception {
+    void execute_whenPartialQuantity_keepsRemainingShares() throws Exception {
         Sale partialSale = TransactionFactory.createSale(share, new BigDecimal("4"), 1);
         BigDecimal initialMoney = player.getMoney();
 
-        partialSale.commit(player);
+        partialSale.execute(player);
 
         assertTrue(partialSale.isCommitted());
         assertEquals(0, partialSale.getShare().getQuantity().compareTo(new BigDecimal("4")));
@@ -68,37 +69,43 @@ class SaleTest {
 
     @DisplayName("createSale: rejects quantity above owned amount")
     @Test
-    void testCreateSale_tooHighQuantity() {
+    void createSale_whenQuantityExceedsHolding_throwsIllegalArgumentException() {
         assertThrows(IllegalArgumentException.class,
                 () -> TransactionFactory.createSale(share, new BigDecimal("11"), 1));
     }
 
-    @DisplayName("commit: throws exception when share not in portfolio")
+    @DisplayName("execute: throws exception when share not in portfolio")
     @Test
-    void testCommit_shareNotInPortfolio() {
+    void execute_whenShareNotOwned_throwsShareNotOwnedException() {
         Player emptyPlayer = new Player("EmptyPlayer", new BigDecimal("5000.00"));
-        assertThrows(ShareNotInPortfolioException.class, () -> sale.commit(emptyPlayer));
+        assertThrows(ShareNotOwnedException.class, () -> sale.execute(emptyPlayer));
         assertFalse(sale.isCommitted());
     }
 
-    @DisplayName("commit: throws exception when already committed")
+    @DisplayName("execute: throws exception when already executed")
     @Test
-    void testCommit_alreadyCommitted() throws Exception {
-        sale.commit(player);
+    void execute_whenAlreadyExecuted_throwsTransactionAlreadyCommittedException() throws Exception {
+        sale.execute(player);
         assertThrows(TransactionAlreadyCommittedException.class,
-                () -> sale.commit(player));
+                () -> sale.execute(player));
     }
 
-    @DisplayName("isCommitted: returns false before commit")
+    @DisplayName("execute: throws NullPointerException when player is null")
     @Test
-    void testIsCommitted_false() {
+    void execute_whenPlayerIsNull_throwsNullPointerException() {
+        assertThrows(NullPointerException.class, () -> sale.execute(null));
+    }
+
+    @DisplayName("isCommitted: returns false before execute")
+    @Test
+    void isCommitted_whenNotExecuted_returnsFalse() {
         assertFalse(sale.isCommitted());
     }
 
-    @DisplayName("isCommitted: returns true after commit")
+    @DisplayName("isCommitted: returns true after execute")
     @Test
-    void testIsCommitted_true() throws Exception {
-        sale.commit(player);
+    void isCommitted_whenExecuted_returnsTrue() throws Exception {
+        sale.execute(player);
         assertTrue(sale.isCommitted());
     }
 

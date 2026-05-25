@@ -1,7 +1,7 @@
 # Millions
 
 Millions er et aksjespill skrevet i Java og JavaFX for IDATx2003 Programmering 2.
-Spilleren starter med kontanter, kjoper og selger aksjeandeler, og folger
+Spilleren starter med kontanter, kjøper og selger aksjeandeler, og følger
 utviklingen i priser, portefoljeverdi, nettoverdi og spillerstatus gjennom
 ukentlige markedsoppdateringer.
 
@@ -12,7 +12,7 @@ ukentlige markedsoppdateringer.
 - JavaFX 25.0.1
 - JUnit Jupiter 6.0.1
 
-GUI-et er bygget programmatisk i JavaFX. Prosjektet bruker ikke FXML.
+GUI-et er bygget programmatisk i JavaFX
 
 ## Bygg og test
 
@@ -24,8 +24,8 @@ mvn test
 mvn package
 ```
 
-`mvn package` bygger applikasjons-JAR og JavaDoc-JAR. Testene kjores som del av
-package-fasen.
+`mvn package` bygger applikasjons-JAR og JavaDoc-JAR. Testene kjøres som del av
+package fasen.
 
 ## Kjor applikasjonen
 

@@ -13,7 +13,6 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
 import no.ntnu.idatx2003.millions.model.Share;
 import no.ntnu.idatx2003.millions.model.transaction.SaleCalculator;
-import no.ntnu.idatx2003.millions.model.transaction.Transaction;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -23,11 +22,9 @@ import java.util.List;
  */
 public class PortfolioView {
     private final ObservableList<Share> shareRows = FXCollections.observableArrayList();
-    private final ObservableList<Transaction> transactionRows = FXCollections.observableArrayList();
     private final ObservableList<MainView.PricePoint> priceHistoryRows = FXCollections.observableArrayList();
     private final VBox root;
     private final TableView<Share> portfolioTable;
-    private final TableView<Transaction> transactionTable;
     private final LineChart<Number, Number> priceHistoryChart;
     private final Label selectedShareLabel;
     private MainView.Actions actions;
@@ -39,18 +36,15 @@ public class PortfolioView {
         portfolioTable = createPortfolioTable();
         priceHistoryChart = createPriceHistoryChart();
         TableView<MainView.PricePoint> priceHistoryTable = createPriceHistoryTable();
-        transactionTable = createTransactionTable();
         selectedShareLabel = mutedLabel("Select a portfolio row to sell.");
 
         root = new VBox(10, sectionTitle("Portfolio"), portfolioTable, selectedShareLabel,
-                sectionTitle("Selected stock history"), priceHistoryChart, priceHistoryTable,
-                sectionTitle("Transactions"), transactionTable);
+                sectionTitle("Selected stock history"), priceHistoryChart, priceHistoryTable);
         root.getStyleClass().add("section-pane");
         root.setPadding(new Insets(18));
         VBox.setVgrow(portfolioTable, Priority.ALWAYS);
         VBox.setVgrow(priceHistoryChart, Priority.ALWAYS);
         VBox.setVgrow(priceHistoryTable, Priority.ALWAYS);
-        VBox.setVgrow(transactionTable, Priority.ALWAYS);
     }
 
     /**
@@ -87,15 +81,6 @@ public class PortfolioView {
      */
     public void setShares(List<Share> shares) {
         shareRows.setAll(shares);
-    }
-
-    /**
-     * Replaces transaction rows.
-     *
-     * @param transactions the transactions to show
-     */
-    public void setTransactions(List<Transaction> transactions) {
-        transactionRows.setAll(transactions);
     }
 
     /**
@@ -137,7 +122,6 @@ public class PortfolioView {
      */
     public void clearSelections() {
         portfolioTable.getSelectionModel().clearSelection();
-        transactionTable.getSelectionModel().clearSelection();
     }
 
     private TableView<Share> createPortfolioTable() {
@@ -211,32 +195,6 @@ public class PortfolioView {
                 .toList();
         series.getData().setAll(points);
         return series;
-    }
-
-    private TableView<Transaction> createTransactionTable() {
-        TableView<Transaction> table = new TableView<>(transactionRows);
-        table.getStyleClass().add("transaction-table");
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        table.setPlaceholder(new Label("No transactions yet"));
-
-        TableColumn<Transaction, String> type = TableColumns.column("Type",
-                transaction -> transaction.getClass().getSimpleName(), 0.16);
-        TableColumn<Transaction, String> week = TableColumns.column("Week",
-                transaction -> Integer.toString(transaction.getWeek()), 0.10);
-        TableColumn<Transaction, String> symbol = TableColumns.column("Symbol",
-                transaction -> transaction.getShare().getStock().getSymbol(), 0.14);
-        TableColumn<Transaction, String> quantity = TableColumns.column("Qty",
-                transaction -> ViewFormat.quantity(transaction.getShare().getQuantity()), 0.12);
-        TableColumn<Transaction, String> gross = TableColumns.column("Gross",
-                transaction -> ViewFormat.money(transaction.getCalculator().calculateGross()), 0.16);
-        TableColumn<Transaction, String> fees = TableColumns.column("Fees",
-                transaction -> ViewFormat.money(transaction.getCalculator().calculateCommission()
-                        .add(transaction.getCalculator().calculateTax())), 0.16);
-        TableColumn<Transaction, String> total = TableColumns.column("Total",
-                transaction -> ViewFormat.money(transaction.getCalculator().calculateTotal()), 0.16);
-
-        table.getColumns().setAll(List.of(type, week, symbol, quantity, gross, fees, total));
-        return table;
     }
 
     private static BigDecimal calculateProfitLoss(Share share) {

@@ -1,10 +1,17 @@
 package no.ntnu.idatx2003.millions.controller;
 
+import no.ntnu.idatx2003.millions.exception.InsufficientFundsException;
 import no.ntnu.idatx2003.millions.exception.InvalidStockDataException;
+import no.ntnu.idatx2003.millions.exception.StockNotFoundException;
+import no.ntnu.idatx2003.millions.exception.TransactionAlreadyCommittedException;
 import no.ntnu.idatx2003.millions.io.StockDataReader;
 import no.ntnu.idatx2003.millions.io.StockDataWriter;
+import no.ntnu.idatx2003.millions.model.Share;
 import no.ntnu.idatx2003.millions.model.Stock;
+import no.ntnu.idatx2003.millions.model.transaction.PurchaseCalculator;
+import no.ntnu.idatx2003.millions.model.transaction.Transaction;
 import no.ntnu.idatx2003.millions.view.MainView;
+import no.ntnu.idatx2003.millions.view.TransactionPreviewDialog;
 
 import java.io.File;
 import java.io.IOException;
@@ -146,11 +153,23 @@ public class MarketController {
     }
 
     private void buy(Stock stock, BigDecimal quantity) {
+        BigDecimal pricePerShare = stock.getSalesPrice();
+        Share previewShare = new Share(stock, quantity, pricePerShare);
+        PurchaseCalculator previewCalculator = new PurchaseCalculator(previewShare);
+
+        if (!view.confirmTransaction(TransactionPreviewDialog.Kind.BUY, stock, quantity,
+                pricePerShare, previewCalculator)) {
+            view.showMessage("Purchase cancelled.", false);
+            return;
+        }
+
         try {
-            session.exchange().buy(stock.getSymbol(), quantity, session.player());
+            Transaction purchase = session.exchange().buy(stock.getSymbol(), quantity, session.player());
             view.showMessage("Bought " + ControllerFormat.quantity(quantity) + " " + stock.getSymbol() + ".", false);
             refreshAll.run();
-        } catch (Exception exception) {
+            view.showReceipt(purchase, session.player());
+        } catch (StockNotFoundException | InsufficientFundsException
+                | TransactionAlreadyCommittedException | IllegalArgumentException exception) {
             view.showMessage(exception.getMessage(), true);
         }
     }

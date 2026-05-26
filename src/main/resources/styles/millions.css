@@ -128,6 +128,16 @@
     -fx-text-fill: #0b4f79;
 }
 
+.destructive-button {
+    -fx-border-color: #e08c8c;
+    -fx-text-fill: #9f1d1d;
+}
+
+.destructive-button:hover {
+    -fx-background-color: #fff1f1;
+    -fx-border-color: #d94848;
+}
+
 .text-field {
     -fx-background-color: #ffffff;
     -fx-border-color: #c8d3e1;
@@ -135,6 +145,27 @@
     -fx-background-radius: 6;
     -fx-padding: 8 10 8 10;
     -fx-text-fill: #111827;
+}
+
+.text-field:invalid {
+    -fx-border-color: #d94848;
+    -fx-background-color: #fffafa;
+}
+
+.table-row-cell:gainer .table-cell {
+    -fx-text-fill: #0f7a55;
+}
+
+.table-row-cell:loser .table-cell {
+    -fx-text-fill: #b42318;
+}
+
+.gainer .table-cell {
+    -fx-text-fill: #0f7a55;
+}
+
+.loser .table-cell {
+    -fx-text-fill: #b42318;
 }
 
 .trade-panel {

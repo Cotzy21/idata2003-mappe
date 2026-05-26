@@ -18,6 +18,7 @@
         <maven.compiler.release>25</maven.compiler.release>
         <javafx.version>25.0.1</javafx.version>
         <junit.version>6.0.1</junit.version>
+        <jackson.version>2.18.3</jackson.version>
         <maven.compiler.plugin.version>3.14.1</maven.compiler.plugin.version>
         <maven.surefire.plugin.version>3.5.4</maven.surefire.plugin.version>
         <javafx.maven.plugin.version>0.0.8</javafx.maven.plugin.version>
@@ -36,6 +37,18 @@
             <groupId>org.openjfx</groupId>
             <artifactId>javafx-graphics</artifactId>
             <version>${javafx.version}</version>
+        </dependency>
+
+        <!-- JSON save/load support -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.datatype</groupId>
+            <artifactId>jackson-datatype-jsr310</artifactId>
+            <version>${jackson.version}</version>
         </dependency>
 
         <!-- JUnit 5 (Jupiter) -->
@@ -119,7 +132,6 @@
         </plugins>
     </build>
 </project>
-
 
 
 

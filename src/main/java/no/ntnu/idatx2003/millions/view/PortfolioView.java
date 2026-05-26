@@ -3,15 +3,16 @@ package no.ntnu.idatx2003.millions.view;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.scene.chart.LineChart;
+import javafx.scene.chart.NumberAxis;
+import javafx.scene.chart.XYChart;
 import javafx.scene.control.Label;
 import javafx.scene.control.TableColumn;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
-import javafx.scene.paint.Color;
 import no.ntnu.idatx2003.millions.model.Share;
 import no.ntnu.idatx2003.millions.model.transaction.SaleCalculator;
-import no.ntnu.idatx2003.millions.model.transaction.Transaction;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -21,11 +22,10 @@ import java.util.List;
  */
 public class PortfolioView {
     private final ObservableList<Share> shareRows = FXCollections.observableArrayList();
-    private final ObservableList<Transaction> transactionRows = FXCollections.observableArrayList();
     private final ObservableList<MainView.PricePoint> priceHistoryRows = FXCollections.observableArrayList();
     private final VBox root;
     private final TableView<Share> portfolioTable;
-    private final TableView<Transaction> transactionTable;
+    private final LineChart<Number, Number> priceHistoryChart;
     private final Label selectedShareLabel;
     private MainView.Actions actions;
 
@@ -34,17 +34,17 @@ public class PortfolioView {
      */
     public PortfolioView() {
         portfolioTable = createPortfolioTable();
+        priceHistoryChart = createPriceHistoryChart();
         TableView<MainView.PricePoint> priceHistoryTable = createPriceHistoryTable();
-        transactionTable = createTransactionTable();
         selectedShareLabel = mutedLabel("Select a portfolio row to sell.");
 
         root = new VBox(10, sectionTitle("Portfolio"), portfolioTable, selectedShareLabel,
-                sectionTitle("Selected stock history"), priceHistoryTable,
-                sectionTitle("Transactions"), transactionTable);
+                sectionTitle("Selected stock history"), priceHistoryChart, priceHistoryTable);
+        root.getStyleClass().add("section-pane");
         root.setPadding(new Insets(18));
         VBox.setVgrow(portfolioTable, Priority.ALWAYS);
+        VBox.setVgrow(priceHistoryChart, Priority.ALWAYS);
         VBox.setVgrow(priceHistoryTable, Priority.ALWAYS);
-        VBox.setVgrow(transactionTable, Priority.ALWAYS);
     }
 
     /**
@@ -84,21 +84,13 @@ public class PortfolioView {
     }
 
     /**
-     * Replaces transaction rows.
-     *
-     * @param transactions the transactions to show
-     */
-    public void setTransactions(List<Transaction> transactions) {
-        transactionRows.setAll(transactions);
-    }
-
-    /**
      * Replaces selected stock price history rows.
      *
      * @param pricePoints the price points to show
      */
     public void setPricePoints(List<MainView.PricePoint> pricePoints) {
         priceHistoryRows.setAll(pricePoints);
+        priceHistoryChart.getData().setAll(List.of(createPriceSeries(pricePoints)));
     }
 
     /**
@@ -122,6 +114,7 @@ public class PortfolioView {
      */
     public void clearPricePoints() {
         priceHistoryRows.clear();
+        priceHistoryChart.getData().clear();
     }
 
     /**
@@ -129,11 +122,11 @@ public class PortfolioView {
      */
     public void clearSelections() {
         portfolioTable.getSelectionModel().clearSelection();
-        transactionTable.getSelectionModel().clearSelection();
     }
 
     private TableView<Share> createPortfolioTable() {
         TableView<Share> table = new TableView<>(shareRows);
+        table.getStyleClass().add("portfolio-table");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("No shares in portfolio"));
 
@@ -161,6 +154,7 @@ public class PortfolioView {
 
     private TableView<MainView.PricePoint> createPriceHistoryTable() {
         TableView<MainView.PricePoint> table = new TableView<>(priceHistoryRows);
+        table.getStyleClass().add("history-table");
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(new Label("Select a stock to see price history"));
 
@@ -175,29 +169,32 @@ public class PortfolioView {
         return table;
     }
 
-    private TableView<Transaction> createTransactionTable() {
-        TableView<Transaction> table = new TableView<>(transactionRows);
-        table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
-        table.setPlaceholder(new Label("No transactions yet"));
+    private LineChart<Number, Number> createPriceHistoryChart() {
+        NumberAxis weekAxis = new NumberAxis();
+        weekAxis.setLabel("Week");
+        weekAxis.setForceZeroInRange(false);
 
-        TableColumn<Transaction, String> type = TableColumns.column("Type",
-                transaction -> transaction.getClass().getSimpleName(), 0.16);
-        TableColumn<Transaction, String> week = TableColumns.column("Week",
-                transaction -> Integer.toString(transaction.getWeek()), 0.10);
-        TableColumn<Transaction, String> symbol = TableColumns.column("Symbol",
-                transaction -> transaction.getShare().getStock().getSymbol(), 0.14);
-        TableColumn<Transaction, String> quantity = TableColumns.column("Qty",
-                transaction -> ViewFormat.quantity(transaction.getShare().getQuantity()), 0.12);
-        TableColumn<Transaction, String> gross = TableColumns.column("Gross",
-                transaction -> ViewFormat.money(transaction.getCalculator().calculateGross()), 0.16);
-        TableColumn<Transaction, String> fees = TableColumns.column("Fees",
-                transaction -> ViewFormat.money(transaction.getCalculator().calculateCommission()
-                        .add(transaction.getCalculator().calculateTax())), 0.16);
-        TableColumn<Transaction, String> total = TableColumns.column("Total",
-                transaction -> ViewFormat.money(transaction.getCalculator().calculateTotal()), 0.16);
+        NumberAxis priceAxis = new NumberAxis();
+        priceAxis.setLabel("Price");
+        priceAxis.setForceZeroInRange(false);
 
-        table.getColumns().setAll(List.of(type, week, symbol, quantity, gross, fees, total));
-        return table;
+        LineChart<Number, Number> chart = new LineChart<>(weekAxis, priceAxis);
+        chart.getStyleClass().add("price-chart");
+        chart.setLegendVisible(false);
+        chart.setAnimated(false);
+        chart.setCreateSymbols(true);
+        chart.setMinHeight(180);
+        return chart;
+    }
+
+    private XYChart.Series<Number, Number> createPriceSeries(List<MainView.PricePoint> pricePoints) {
+        XYChart.Series<Number, Number> series = new XYChart.Series<>();
+        series.setName("Price");
+        List<XYChart.Data<Number, Number>> points = pricePoints.reversed().stream()
+                .map(point -> new XYChart.Data<Number, Number>(point.week(), point.price()))
+                .toList();
+        series.getData().setAll(points);
+        return series;
     }
 
     private static BigDecimal calculateProfitLoss(Share share) {
@@ -208,13 +205,14 @@ public class PortfolioView {
 
     private static Label sectionTitle(String text) {
         Label label = new Label(text);
-        label.setStyle("-fx-font-size: 16px; -fx-font-weight: 700;");
+        label.getStyleClass().add("section-title");
         return label;
     }
 
     private static Label mutedLabel(String text) {
         Label label = new Label(text);
-        label.setTextFill(Color.web("#4f5865"));
+        label.getStyleClass().add("muted-label");
+        label.setWrapText(true);
         return label;
     }
 }

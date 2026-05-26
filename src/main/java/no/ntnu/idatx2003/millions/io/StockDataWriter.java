@@ -7,7 +7,16 @@ import java.io.Writer;
 import java.util.List;
 
 /**
- * Defines a strategy for writing stock data to a character stream.
+ * Strategy interface for writing stock data to a character stream.
+ *
+ * <p>This is the write half of the <em>Strategy</em> pattern used for stock
+ * file I/O. The concrete strategy ({@link CsvStockWriter} today) is selected
+ * by the {@link no.ntnu.idatx2003.millions.controller.MainController} and
+ * passed into the controllers, so introducing a new format does not require
+ * touching any caller.</p>
+ *
+ * @see StockDataReader
+ * @see CsvStockWriter
  */
 public interface StockDataWriter {
 

@@ -1,46 +1,49 @@
 package no.ntnu.idatx2003.millions.controller;
 
-import no.ntnu.idatx2003.millions.exception.InvalidStockDataException;
 import no.ntnu.idatx2003.millions.io.CsvStockReader;
 import no.ntnu.idatx2003.millions.io.CsvStockWriter;
+import no.ntnu.idatx2003.millions.io.GameState;
+import no.ntnu.idatx2003.millions.io.GameStateMapper;
+import no.ntnu.idatx2003.millions.io.GameStateReader;
+import no.ntnu.idatx2003.millions.io.GameStateWriter;
+import no.ntnu.idatx2003.millions.io.JsonGameStateReader;
+import no.ntnu.idatx2003.millions.io.JsonGameStateWriter;
 import no.ntnu.idatx2003.millions.io.StockDataReader;
 import no.ntnu.idatx2003.millions.io.StockDataWriter;
-import no.ntnu.idatx2003.millions.model.Exchange;
-import no.ntnu.idatx2003.millions.model.Player;
 import no.ntnu.idatx2003.millions.model.Share;
 import no.ntnu.idatx2003.millions.model.Stock;
-import no.ntnu.idatx2003.millions.model.transaction.SaleCalculator;
-import no.ntnu.idatx2003.millions.model.transaction.Transaction;
+import no.ntnu.idatx2003.millions.util.Validate;
 import no.ntnu.idatx2003.millions.view.MainView;
+import no.ntnu.idatx2003.millions.view.NewGameResult;
 
+import java.math.BigDecimal;
 import java.io.File;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Objects;
+import java.util.Optional;
 
 /**
- * Coordinates user actions between {@link MainView} and the game model.
+ * Coordinates the specialized controllers for the main Millions screen.
  */
 public class MainController implements MainView.Actions {
     private static final BigDecimal DEFAULT_STARTING_MONEY = new BigDecimal("100000.00");
 
     private final MainView view;
     private final StockDataReader stockDataReader;
-    private final StockDataWriter stockDataWriter;
-    private BigDecimal startingMoney = DEFAULT_STARTING_MONEY;
-    private Exchange exchange;
-    private Player player;
+    private final GameStateReader gameStateReader;
+    private final GameStateWriter gameStateWriter;
+    private final GameSession session;
+    private final MarketController marketController;
+    private final PortfolioController portfolioController;
+    private final TransactionController transactionController;
 
     /**
-     * Creates the main controller.
+     * Creates the main controller using the default CSV strategies.
      *
      * @param view the view to control; must not be {@code null}
      */
@@ -56,259 +59,159 @@ public class MainController implements MainView.Actions {
      * @param stockDataWriter the writer strategy to use; must not be {@code null}
      */
     public MainController(MainView view, StockDataReader stockDataReader, StockDataWriter stockDataWriter) {
-        this.view = Objects.requireNonNull(view, "view must not be null");
-        this.stockDataReader = Objects.requireNonNull(stockDataReader, "stockDataReader must not be null");
-        this.stockDataWriter = Objects.requireNonNull(stockDataWriter, "stockDataWriter must not be null");
+        this.view = Validate.requireNonNull(view, "view");
+        this.stockDataReader = Validate.requireNonNull(stockDataReader, "stockDataReader");
+        this.gameStateReader = new JsonGameStateReader();
+        this.gameStateWriter = new JsonGameStateWriter();
+        this.session = new GameSession(DEFAULT_STARTING_MONEY);
+        this.transactionController = new TransactionController();
+        this.marketController = new MarketController(
+                view,
+                session,
+                stockDataReader,
+                Validate.requireNonNull(stockDataWriter, "stockDataWriter"),
+                this::refreshAll,
+                this::resetGame);
+        this.portfolioController = new PortfolioController(view, session, this::refreshAll);
         this.view.setActions(this);
     }
 
     /**
-     * Initializes a new default game and refreshes the view.
+     * Shows the new-game dialog at startup and prepares the session from the
+     * dialog result. If the user cancels, falls back to the built-in defaults
+     * so the application is always in a playable state.
      */
     public void initialize() {
-        resetGame(createDefaultStocks(), "Ready.");
+        Optional<NewGameResult> result = view.askNewGame(stockDataReader,
+                MainController::createDefaultStocks,
+                session.playerName(),
+                session.startingMoney());
+        if (result.isPresent()) {
+            applyNewGame(result.get());
+        } else {
+            resetGame(createDefaultStocks(), "Ready.");
+        }
     }
 
-    /**
-     * Handles buying the selected stock.
-     */
     @Override
     public void onBuySelectedStock() {
-        Stock stock = view.getSelectedStock();
-        if (stock == null) {
-            view.showMessage("Select a stock before buying.", true);
-            return;
-        }
-
-        BigDecimal quantity = parseQuantity();
-        if (quantity == null) {
-            return;
-        }
-
-        try {
-            exchange.buy(stock.getSymbol(), quantity, player);
-            view.showMessage("Bought " + formatQuantity(quantity) + " " + stock.getSymbol() + ".", false);
-            refreshAll();
-        } catch (Exception exception) {
-            view.showMessage(exception.getMessage(), true);
-        }
+        marketController.buySelectedStock();
     }
 
-    /**
-     * Handles selling the selected portfolio share.
-     */
     @Override
     public void onSellSelectedShare() {
-        Share share = view.getSelectedShare();
-        if (share == null) {
-            view.showMessage("Select a portfolio row before selling.", true);
-            return;
-        }
-
-        BigDecimal quantity = parseQuantity();
-        if (quantity == null) {
-            return;
-        }
-
-        try {
-            exchange.sell(share, quantity, player);
-            view.showMessage("Sold " + formatQuantity(quantity) + " "
-                    + share.getStock().getSymbol() + ".", false);
-            refreshAll();
-        } catch (Exception exception) {
-            view.showMessage(exception.getMessage(), true);
-        }
+        portfolioController.sellSelectedShare();
     }
 
-    /**
-     * Handles advancing the game by one week.
-     */
     @Override
     public void onAdvanceWeek() {
-        exchange.advance();
-        view.showMessage("Advanced to week " + exchange.getWeek() + ".", false);
-        refreshAll();
+        marketController.advanceWeek();
     }
 
-    /**
-     * Handles loading stocks from CSV.
-     */
     @Override
     public void onLoadStocks() {
-        File file = view.chooseCsvFileToLoad();
+        marketController.loadStocksFromCsv();
+    }
+
+    @Override
+    public void onSaveStocks() {
+        marketController.saveStocksToCsv();
+    }
+
+    @Override
+    public void onNewGame() {
+        view.askNewGame(stockDataReader,
+                MainController::createDefaultStocks,
+                session.playerName(),
+                session.startingMoney())
+                .ifPresent(this::applyNewGame);
+    }
+
+    @Override
+    public void onShowMarketOverview() {
+        view.showWinnersLosers(session.exchange());
+    }
+
+    @Override
+    public void onLiquidateAndExit() {
+        portfolioController.liquidateAndExit();
+    }
+
+    @Override
+    public void onLoadGame() {
+        File file = view.chooseGameFileToLoad();
         if (file == null) {
             return;
         }
-
         try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-            List<Stock> stocks = stockDataReader.read(reader);
-            if (stocks.isEmpty()) {
-                view.showMessage("CSV file contains no stocks.", true);
-                return;
-            }
-            resetGame(stocks, "Loaded " + stocks.size() + " stocks from " + file.getName() + ".");
-        } catch (IOException | InvalidStockDataException exception) {
+            GameState gameState = gameStateReader.read(reader);
+            GameStateMapper.MaterializedGameState materialized = GameStateMapper.fromGameState(gameState);
+            session.load(materialized.player(), materialized.exchange());
+            session.exchange().addObserver(exchange -> refreshAll());
+            view.clearSelections();
+            refreshAll();
+            view.showMessage("Loaded game from " + file.getName() + ".", false);
+        } catch (IOException | IllegalArgumentException exception) {
             view.showMessage(exception.getMessage(), true);
         }
     }
 
-    /**
-     * Handles saving stocks to CSV.
-     */
     @Override
-    public void onSaveStocks() {
-        File file = view.chooseCsvFileToSave("stocks-week-" + exchange.getWeek() + ".csv");
+    public void onSaveGame() {
+        File file = view.chooseGameFileToSave("millions-week-" + session.exchange().getWeek() + ".json");
         if (file == null) {
             return;
         }
-
         try (Writer writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
-            stockDataWriter.write(writer, exchange.getAllStocks());
-            view.showMessage("Saved stocks to " + file.getName() + ".", false);
+            gameStateWriter.write(writer, GameStateMapper.toGameState(session.player(), session.exchange()));
+            view.showMessage("Saved game to " + file.getName() + ".", false);
         } catch (IOException exception) {
             view.showMessage(exception.getMessage(), true);
         }
     }
 
-    /**
-     * Handles starting a new game.
-     */
-    @Override
-    public void onNewGame() {
-        view.askStartingMoney(startingMoney).ifPresent(this::startNewGame);
-    }
-
-    /**
-     * Handles selected stock changes.
-     *
-     * @param stock the selected stock, or {@code null}
-     */
     @Override
     public void onStockSelected(Stock stock) {
-        if (stock == null) {
-            view.clearSelectedStockDetails();
-            return;
+        marketController.showStockDetails(stock);
+        if (stock != null) {
+            view.requestQuantityFocus();
         }
-        view.setSelectedStockDetails(stock.getSymbol() + " " + stock.getCompany()
-                + " | price " + formatMoney(stock.getSalesPrice())
-                + " | latest change " + formatSignedMoney(stock.getLatestPriceChange())
-                + " | high " + formatMoney(stock.getHighestPrice())
-                + " | low " + formatMoney(stock.getLowestPrice()), createPricePoints(stock));
     }
 
-    /**
-     * Handles selected portfolio share changes.
-     *
-     * @param share the selected share, or {@code null}
-     */
     @Override
     public void onShareSelected(Share share) {
-        if (share == null) {
-            view.clearSelectedShareDetails();
-            return;
-        }
-        view.setSelectedShareDetails("Holding " + formatQuantity(share.getQuantity()) + " "
-                + share.getStock().getSymbol() + " | estimated sale proceeds "
-                + formatMoney(new SaleCalculator(share).calculateTotal()));
+        portfolioController.showShareDetails(share);
     }
 
-    private void startNewGame(String rawStartingMoney) {
-        try {
-            BigDecimal newStartingMoney = new BigDecimal(rawStartingMoney.trim());
-            if (newStartingMoney.compareTo(BigDecimal.ZERO) < 0) {
-                view.showMessage("Starting money must be non-negative.", true);
-                return;
-            }
-            startingMoney = newStartingMoney;
-            resetGame(createDefaultStocks(), "New game started with " + formatMoney(startingMoney) + " cash.");
-        } catch (NumberFormatException exception) {
-            view.showMessage("Starting money must be a valid number.", true);
-        }
+    private void applyNewGame(NewGameResult result) {
+        session.setPlayerName(result.playerName());
+        session.setStartingMoney(result.startingMoney());
+        String source = result.sourceFile() == null ? "default stocks" : result.sourceFile().getName();
+        resetGame(result.stocks(), "New game for " + result.playerName()
+                + " with " + ControllerFormat.money(result.startingMoney())
+                + " cash (" + source + ").");
     }
 
     private void resetGame(List<Stock> stocks, String message) {
-        exchange = new Exchange("Millions Exchange", stocks);
-        player = new Player("Player", startingMoney);
+        session.reset(stocks);
+        session.exchange().addObserver(exchange -> refreshAll());
         view.clearSelections();
         refreshAll();
         view.showMessage(message, false);
     }
 
-    private BigDecimal parseQuantity() {
-        String rawQuantity = view.getQuantityText();
-        if (rawQuantity == null || rawQuantity.isBlank()) {
-            view.showMessage("Quantity must be filled in.", true);
-            return null;
-        }
-
-        try {
-            BigDecimal quantity = new BigDecimal(rawQuantity.trim());
-            if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
-                view.showMessage("Quantity must be greater than zero.", true);
-                return null;
-            }
-            return quantity;
-        } catch (NumberFormatException exception) {
-            view.showMessage("Quantity must be a valid number.", true);
-            return null;
-        }
-    }
-
     private void refreshAll() {
-        view.setStocks(exchange.getAllStocks().stream()
+        view.setStocks(session.exchange().getAllStocks().stream()
                 .sorted(Comparator.comparing(Stock::getSymbol))
                 .toList());
-        view.setShares(player.getPortfolio().getShares());
-        view.setTransactions(getSortedTransactions());
-        view.setSummary(exchange.getWeek(), player.getMoney(), player.getPortfolio().getNetWorth(),
-                player.getNetWorth(), player.getStatus().name());
-        updateMarketStats();
-        onStockSelected(view.getSelectedStock());
-        onShareSelected(view.getSelectedShare());
-    }
-
-    private List<Transaction> getSortedTransactions() {
-        List<Transaction> transactions = new ArrayList<>(player.getTransactionArchive().getTransactions());
-        transactions.sort(Comparator.comparingInt(Transaction::getWeek).reversed());
-        return List.copyOf(transactions);
-    }
-
-    private void updateMarketStats() {
-        List<Stock> gainers = exchange.getGainers(1);
-        List<Stock> losers = exchange.getLosers(1);
-        if (gainers.isEmpty() || losers.isEmpty()) {
-            view.setMarketStats("No market statistics available.");
-            return;
-        }
-        Stock gainer = gainers.getFirst();
-        Stock loser = losers.getFirst();
-        view.setMarketStats("Top gainer: " + gainer.getSymbol() + " "
-                + formatSignedMoney(gainer.getLatestPriceChange())
-                + " | Top loser: " + loser.getSymbol() + " "
-                + formatSignedMoney(loser.getLatestPriceChange()));
-    }
-
-    private List<MainView.PricePoint> createPricePoints(Stock stock) {
-        List<BigDecimal> prices = stock.getHistoricalPrices();
-        List<MainView.PricePoint> points = new ArrayList<>();
-        for (int index = 0; index < prices.size(); index++) {
-            BigDecimal previous = index == 0 ? prices.get(index) : prices.get(index - 1);
-            points.add(new MainView.PricePoint(index + 1, prices.get(index), prices.get(index).subtract(previous)));
-        }
-        return points.reversed();
-    }
-
-    private static String formatMoney(BigDecimal amount) {
-        return amount.setScale(2, RoundingMode.HALF_UP).toPlainString();
-    }
-
-    private static String formatSignedMoney(BigDecimal amount) {
-        String value = formatMoney(amount);
-        return amount.compareTo(BigDecimal.ZERO) > 0 ? "+" + value : value;
-    }
-
-    private static String formatQuantity(BigDecimal quantity) {
-        return quantity.stripTrailingZeros().toPlainString();
+        view.setShares(session.player().getPortfolio().getShares());
+        view.setTransactions(transactionController.getTransactionsNewestFirst(session.player()));
+        view.setSummary(session.playerName(), session.exchange().getWeek(),
+                session.player().getMoney(), session.player().getPortfolio().getNetWorth(),
+                session.player().getNetWorth(), session.player().getStatus().name());
+        marketController.updateMarketStats();
+        marketController.showStockDetails(view.getSelectedStock());
+        portfolioController.showShareDetails(view.getSelectedShare());
     }
 
     private static List<Stock> createDefaultStocks() {

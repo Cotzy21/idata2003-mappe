@@ -8,7 +8,18 @@ import java.io.Reader;
 import java.util.List;
 
 /**
- * Defines a strategy for reading stock data from a character stream.
+ * Strategy interface for reading stock data from a character stream.
+ *
+ * <p>This is the read half of the <em>Strategy</em> pattern used for stock
+ * file I/O. The concrete strategy ({@link CsvStockReader} today; a future
+ * {@code JsonStockReader} would slot in identically) is chosen by the
+ * {@link no.ntnu.idatx2003.millions.controller.MainController} when the
+ * application starts up, and is passed into the controllers via constructor
+ * injection. Call sites depend only on this interface, so adding a new
+ * format does not require modifying the controllers or the model.</p>
+ *
+ * @see StockDataWriter
+ * @see CsvStockReader
  */
 public interface StockDataReader {
 

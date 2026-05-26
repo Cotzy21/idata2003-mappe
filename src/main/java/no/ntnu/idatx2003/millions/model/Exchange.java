@@ -1,8 +1,16 @@
 package no.ntnu.idatx2003.millions.model;
 
+import no.ntnu.idatx2003.millions.exception.InsufficientFundsException;
+import no.ntnu.idatx2003.millions.exception.ShareNotOwnedException;
 import no.ntnu.idatx2003.millions.exception.StockNotFoundException;
+import no.ntnu.idatx2003.millions.exception.TransactionAlreadyCommittedException;
+import no.ntnu.idatx2003.millions.model.transaction.Purchase;
+import no.ntnu.idatx2003.millions.model.transaction.Sale;
 import no.ntnu.idatx2003.millions.model.transaction.Transaction;
 import no.ntnu.idatx2003.millions.model.transaction.TransactionFactory;
+import no.ntnu.idatx2003.millions.observer.Observable;
+import no.ntnu.idatx2003.millions.observer.Observer;
+import no.ntnu.idatx2003.millions.util.Validate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -17,30 +25,40 @@ import java.util.stream.Collectors;
  * Represents a stock exchange.
  * Manages available stocks, week tracking, and price updates.
  */
-public class Exchange {
+public class Exchange implements Observable<Exchange> {
     private final String name;
     private int week;
     private final Map<String, Stock> stockMap;
     private final Random random;
+    private final List<Observer<Exchange>> observers;
 
     /**
      * Constructs an Exchange with initial stocks.
      *
-     * @param name the name of the exchange
-     * @param stocks the initial list of stocks
+     * @param name the name of the exchange; must not be blank
+     * @param stocks the initial list of stocks; must not be {@code null}
      */
     public Exchange(String name, List<Stock> stocks) {
-        if (name == null || name.isBlank()) {
-            throw new IllegalArgumentException("Exchange name cannot be null or empty");
-        }
-        if (stocks == null) {
-            throw new IllegalArgumentException("Stocks list cannot be null");
-        }
+        this(name, stocks, 1);
+    }
+
+    /**
+     * Constructs an Exchange with initial stocks and a specific week.
+     *
+     * @param name the name of the exchange; must not be blank
+     * @param stocks the initial list of stocks; must not be {@code null}
+     * @param week the current week; must be at least 1
+     */
+    public Exchange(String name, List<Stock> stocks, int week) {
+        Validate.requireNotBlank(name, "name");
+        Validate.requireNonNull(stocks, "stocks");
+        Validate.requireInRange(week, 1, Integer.MAX_VALUE, "week");
 
         this.name = name;
-        this.week = 1;
+        this.week = week;
         this.stockMap = new HashMap<>();
         this.random = new Random();
+        this.observers = new ArrayList<>();
 
         for (Stock stock : stocks) {
             if (stock != null) {
@@ -99,13 +117,10 @@ public class Exchange {
      */
     public List<Stock> findStocks(String searchTerm) {
         if (searchTerm == null || searchTerm.isBlank()) {
-            return new ArrayList<>(stockMap.values());
+            return List.copyOf(stockMap.values());
         }
-
-        String lowerTerm = searchTerm.toLowerCase();
         return stockMap.values().stream()
-                .filter(stock -> stock.getSymbol().toLowerCase().contains(lowerTerm) ||
-                        stock.getCompany().toLowerCase().contains(lowerTerm))
+                .filter(stock -> StockSearch.matches(stock, searchTerm))
                 .collect(Collectors.toUnmodifiableList());
     }
 
@@ -115,30 +130,40 @@ public class Exchange {
      * @param symbol the stock symbol
      * @param quantity the number of shares to buy
      * @param player the player making the purchase
-     * @return the completed Purchase transaction
+     * @return the executed Purchase transaction
      * @throws StockNotFoundException if the stock doesn't exist
-     * @throws Exception if the purchase fails
+     * @throws InsufficientFundsException if the player cannot afford the purchase
+     * @throws TransactionAlreadyCommittedException never thrown for a fresh transaction;
+     *     declared for completeness with the {@link Transaction} contract
      */
     public Transaction buy(String symbol, BigDecimal quantity, Player player)
-            throws StockNotFoundException, Exception {
+            throws StockNotFoundException, InsufficientFundsException,
+            TransactionAlreadyCommittedException {
+        Validate.requireNonNull(player, "player");
+        Validate.requirePositive(quantity, "quantity");
         Stock stock = getStock(symbol);
         Share share = new Share(stock, quantity, stock.getSalesPrice());
-        Transaction purchase = TransactionFactory.createPurchase(share, week);
-        purchase.commit(player);
+        Purchase purchase = TransactionFactory.createPurchase(share, week);
+        purchase.execute(player);
         return purchase;
     }
 
     /**
-     * Sells shares to the exchange.
+     * Sells an entire share back to the exchange.
      *
      * @param share the Share to sell
      * @param player the player making the sale
-     * @return the completed Sale transaction
-     * @throws Exception if the sale fails
+     * @return the executed Sale transaction
+     * @throws ShareNotOwnedException if the share is not in the player's portfolio
+     * @throws TransactionAlreadyCommittedException never thrown for a fresh transaction;
+     *     declared for completeness with the {@link Transaction} contract
      */
-    public Transaction sell(Share share, Player player) throws Exception {
-        Transaction sale = TransactionFactory.createSale(share, week);
-        sale.commit(player);
+    public Transaction sell(Share share, Player player)
+            throws ShareNotOwnedException, TransactionAlreadyCommittedException {
+        Validate.requireNonNull(share, "share");
+        Validate.requireNonNull(player, "player");
+        Sale sale = TransactionFactory.createSale(share, week);
+        sale.execute(player);
         return sale;
     }
 
@@ -148,12 +173,18 @@ public class Exchange {
      * @param share the portfolio Share to sell from
      * @param quantity the quantity to sell
      * @param player the player making the sale
-     * @return the completed Sale transaction
-     * @throws Exception if the sale fails
+     * @return the executed Sale transaction
+     * @throws ShareNotOwnedException if the share is not in the player's portfolio
+     * @throws TransactionAlreadyCommittedException never thrown for a fresh transaction;
+     *     declared for completeness with the {@link Transaction} contract
      */
-    public Transaction sell(Share share, BigDecimal quantity, Player player) throws Exception {
-        Transaction sale = TransactionFactory.createSale(share, quantity, week);
-        sale.commit(player);
+    public Transaction sell(Share share, BigDecimal quantity, Player player)
+            throws ShareNotOwnedException, TransactionAlreadyCommittedException {
+        Validate.requireNonNull(share, "share");
+        Validate.requirePositive(quantity, "quantity");
+        Validate.requireNonNull(player, "player");
+        Sale sale = TransactionFactory.createSale(share, quantity, week);
+        sale.execute(player);
         return sale;
     }
 
@@ -164,32 +195,66 @@ public class Exchange {
      */
     public void advance() {
         week++;
+        stockMap.values().forEach(this::updatePriceFor);
+        notifyObservers();
+    }
 
-        for (Stock stock : stockMap.values()) {
-            BigDecimal currentPrice = stock.getSalesPrice();
+    /**
+     * Adds an observer that is notified when the exchange changes.
+     *
+     * @param observer the observer to add; must not be {@code null}
+     * @return {@code true} if the observer was added
+     */
+    @Override
+    public boolean addObserver(Observer<Exchange> observer) {
+        Validate.requireNonNull(observer, "observer");
+        return observers.add(observer);
+    }
 
-            int basisPoints = random.nextInt(2001) - 1000;
-            BigDecimal multiplier = BigDecimal.ONE.add(
-                    BigDecimal.valueOf(basisPoints).movePointLeft(4));
+    /**
+     * Removes an observer.
+     *
+     * @param observer the observer to remove; must not be {@code null}
+     * @return {@code true} if the observer was removed
+     */
+    @Override
+    public boolean removeObserver(Observer<Exchange> observer) {
+        Validate.requireNonNull(observer, "observer");
+        return observers.remove(observer);
+    }
 
-            BigDecimal newPrice = currentPrice.multiply(multiplier)
-                    .setScale(2, RoundingMode.HALF_UP);
+    /**
+     * Notifies all registered observers about an exchange update.
+     */
+    @Override
+    public void notifyObservers() {
+        List.copyOf(observers).forEach(observer -> observer.update(this));
+    }
 
-            if (newPrice.compareTo(BigDecimal.ZERO) < 0) {
-                newPrice = BigDecimal.ZERO;
-            }
-            stock.addNewSalesPrice(newPrice);
+    private void updatePriceFor(Stock stock) {
+        BigDecimal currentPrice = stock.getSalesPrice();
+        int basisPoints = random.nextInt(2001) - 1000;
+        BigDecimal multiplier = BigDecimal.ONE.add(
+                BigDecimal.valueOf(basisPoints).movePointLeft(4));
+
+        BigDecimal newPrice = currentPrice.multiply(multiplier)
+                .setScale(2, RoundingMode.HALF_UP);
+
+        if (newPrice.compareTo(BigDecimal.ZERO) < 0) {
+            newPrice = BigDecimal.ZERO;
         }
+        stock.addNewSalesPrice(newPrice);
     }
 
     /**
      * Gets the top-performing stocks (gainers) up to a limit.
      * Sorted by latest price change in descending order.
      *
-     * @param limit the maximum number of stocks to return
+     * @param limit the maximum number of stocks to return; must be non-negative
      * @return a list of top gainers
      */
     public List<Stock> getGainers(int limit) {
+        Validate.requireInRange(limit, 0, Integer.MAX_VALUE, "limit");
         return stockMap.values().stream()
                 .sorted((s1, s2) -> s2.getLatestPriceChange().compareTo(s1.getLatestPriceChange()))
                 .limit(limit)
@@ -200,10 +265,11 @@ public class Exchange {
      * Gets the worst-performing stocks (losers) up to a limit.
      * Sorted by latest price change in ascending order.
      *
-     * @param limit the maximum number of stocks to return
+     * @param limit the maximum number of stocks to return; must be non-negative
      * @return a list of top losers
      */
     public List<Stock> getLosers(int limit) {
+        Validate.requireInRange(limit, 0, Integer.MAX_VALUE, "limit");
         return stockMap.values().stream()
                 .sorted((s1, s2) -> s1.getLatestPriceChange().compareTo(s2.getLatestPriceChange()))
                 .limit(limit)

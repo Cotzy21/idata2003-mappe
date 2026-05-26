@@ -1,0 +1,223 @@
+.root {
+    -fx-font-family: "SF Pro Text", "Inter", "Segoe UI", "System";
+    -fx-background-color: #f7f9fc;
+    -fx-text-fill: #172033;
+}
+
+.app-root {
+    -fx-background-color: linear-gradient(to bottom, #ffffff, #f5f8fc);
+}
+
+.app-header {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d9e1ec;
+    -fx-border-width: 0 0 1 0;
+}
+
+.app-title {
+    -fx-font-size: 30px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #111827;
+}
+
+.app-subtitle,
+.muted-label {
+    -fx-text-fill: #64748b;
+}
+
+.metric-label {
+    -fx-font-size: 12px;
+    -fx-font-weight: 700;
+    -fx-text-fill: #667085;
+}
+
+.metric-value {
+    -fx-font-size: 16px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #111827;
+}
+
+.section-pane {
+    -fx-background-color: #ffffff;
+}
+
+.section-title {
+    -fx-font-size: 17px;
+    -fx-font-weight: 800;
+    -fx-text-fill: #111827;
+}
+
+.split-pane {
+    -fx-background-color: #edf2f7;
+}
+
+.split-pane:horizontal > .split-pane-divider {
+    -fx-background-color: #d9e1ec;
+    -fx-padding: 0 1 0 1;
+}
+
+.table-view {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d7deea;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 0;
+}
+
+.table-view .column-header-background {
+    -fx-background-color: #f0f4f9;
+    -fx-background-radius: 6 6 0 0;
+}
+
+.table-view .column-header,
+.table-view .filler {
+    -fx-background-color: transparent;
+    -fx-border-color: #d7deea;
+}
+
+.table-view .column-header .label {
+    -fx-text-fill: #334155;
+    -fx-font-size: 13px;
+    -fx-font-weight: 800;
+}
+
+.table-row-cell {
+    -fx-background-color: #ffffff;
+    -fx-border-color: transparent transparent #edf1f6 transparent;
+    -fx-cell-size: 30px;
+}
+
+.table-row-cell:odd {
+    -fx-background-color: #fbfcfe;
+}
+
+.table-row-cell:selected {
+    -fx-background-color: #dff1ff;
+    -fx-text-background-color: #0f172a;
+}
+
+.table-cell {
+    -fx-text-fill: #1f2937;
+    -fx-font-size: 13px;
+    -fx-padding: 6 8 6 8;
+}
+
+.button {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c8d3e1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-text-fill: #1f2937;
+    -fx-font-weight: 700;
+    -fx-padding: 8 12 8 12;
+    -fx-cursor: hand;
+}
+
+.button:hover {
+    -fx-background-color: #f5f9ff;
+    -fx-border-color: #7cb7e8;
+}
+
+.button:pressed {
+    -fx-background-color: #e8f4ff;
+}
+
+.button:default {
+    -fx-background-color: #dcefff;
+    -fx-border-color: #55a6df;
+    -fx-text-fill: #0b4f79;
+}
+
+.destructive-button {
+    -fx-border-color: #e08c8c;
+    -fx-text-fill: #9f1d1d;
+}
+
+.destructive-button:hover {
+    -fx-background-color: #fff1f1;
+    -fx-border-color: #d94848;
+}
+
+.text-field {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #c8d3e1;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8 10 8 10;
+    -fx-text-fill: #111827;
+}
+
+.text-field:invalid {
+    -fx-border-color: #d94848;
+    -fx-background-color: #fffafa;
+}
+
+.table-row-cell:gainer .table-cell {
+    -fx-text-fill: #0f7a55;
+}
+
+.table-row-cell:loser .table-cell {
+    -fx-text-fill: #b42318;
+}
+
+.gainer .table-cell {
+    -fx-text-fill: #0f7a55;
+}
+
+.loser .table-cell {
+    -fx-text-fill: #b42318;
+}
+
+.trade-panel {
+    -fx-background-color: #ffffff;
+}
+
+.trade-actions {
+    -fx-row-valignment: center;
+}
+
+.chart {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d7deea;
+    -fx-border-radius: 6;
+    -fx-background-radius: 6;
+    -fx-padding: 8;
+}
+
+.chart-plot-background {
+    -fx-background-color: #fbfcfe;
+}
+
+.chart-vertical-grid-lines,
+.chart-horizontal-grid-lines {
+    -fx-stroke: #dce3ec;
+    -fx-stroke-dash-array: 4 4;
+}
+
+.chart-series-line {
+    -fx-stroke: #1d9a8a;
+    -fx-stroke-width: 2.5px;
+}
+
+.default-color0.chart-line-symbol {
+    -fx-background-color: #1d9a8a, #ffffff;
+}
+
+.axis {
+    -fx-tick-label-fill: #64748b;
+}
+
+.axis-label {
+    -fx-text-fill: #334155;
+    -fx-font-weight: 700;
+}
+
+.status-bar {
+    -fx-background-color: #ffffff;
+    -fx-border-color: #d9e1ec;
+    -fx-border-width: 1 0 0 0;
+}
+
+.status-message {
+    -fx-font-weight: 700;
+}

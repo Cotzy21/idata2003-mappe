@@ -41,11 +41,23 @@ class PlayerTest {
                 () -> new Player("", new BigDecimal("10000")));
     }
 
+    @Test
+    void constructor_whenNameIsBlank_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Player("   ", new BigDecimal("10000")));
+    }
+
     @DisplayName("Constructor: throws exception for negative starting money")
     @Test
     void testConstructor_negativeMoney() {
         assertThrows(IllegalArgumentException.class,
                 () -> new Player("Alice", new BigDecimal("-100")));
+    }
+
+    @Test
+    void constructor_whenStartingMoneyIsNegative_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Player("Alice", new BigDecimal("-0.01")));
     }
 
     @DisplayName("addMoney: increases current money")
@@ -76,11 +88,23 @@ class PlayerTest {
                 () -> player.withdrawMoney(new BigDecimal("20000.00")));
     }
 
+    @Test
+    void withdrawMoney_whenAmountExceedsBalance_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> player.withdrawMoney(new BigDecimal("10000.01")));
+    }
+
     @DisplayName("withdrawMoney: throws exception for negative amount")
     @Test
     void testWithdrawMoney_negative() {
         assertThrows(IllegalArgumentException.class,
                 () -> player.withdrawMoney(new BigDecimal("-100")));
+    }
+
+    @Test
+    void withdrawMoney_whenAmountIsNegative_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> player.withdrawMoney(new BigDecimal("-0.01")));
     }
 
     @DisplayName("getNetWorth: returns money + portfolio value")
@@ -98,6 +122,13 @@ class PlayerTest {
     @DisplayName("getStatus: returns NOVICE for new player")
     @Test
     void testGetStatus_novice() {
+        assertEquals(PlayerStatus.NOVICE, player.getStatus());
+    }
+
+    @Test
+    void getStatus_whenZeroWeeks_returnsNovice() {
+        player.addMoney(new BigDecimal("10000.00"));
+
         assertEquals(PlayerStatus.NOVICE, player.getStatus());
     }
 
@@ -137,6 +168,18 @@ class PlayerTest {
         assertEquals(PlayerStatus.SPECULATOR, player.getStatus());
     }
 
+    @Test
+    void getStatus_whenBothSpeculatorAndInvestorMatch_returnsSpeculator() {
+        for (int week = 1; week <= 20; week++) {
+            Stock stock = new Stock("SPEC" + week, "Spec " + week, new BigDecimal("100.00"));
+            Share share = new Share(stock, BigDecimal.ONE, new BigDecimal("100.00"));
+            player.getTransactionArchive().add(TransactionFactory.createPurchase(share, week));
+        }
+        player.addMoney(new BigDecimal("10000.00"));
+
+        assertEquals(PlayerStatus.SPECULATOR, player.getStatus());
+    }
+
     @DisplayName("Getters: return correct values")
     @Test
     void testGetters() {
@@ -152,4 +195,3 @@ class PlayerTest {
         }
     }
 }
-

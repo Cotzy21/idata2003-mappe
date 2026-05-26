@@ -6,8 +6,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -47,10 +50,16 @@ class ExchangeTest {
                 () -> new Exchange(null, stocks));
     }
 
+    @Test
+    void constructor_whenNameIsBlank_throwsIllegalArgumentException() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new Exchange("   ", List.of(stock1)));
+    }
+
     @DisplayName("Constructor: throws exception for null stocks list")
     @Test
     void testConstructor_nullStocks() {
-        assertThrows(IllegalArgumentException.class,
+        assertThrows(NullPointerException.class,
                 () -> new Exchange("NYSE", null));
     }
 
@@ -129,6 +138,42 @@ class ExchangeTest {
         assertTrue(newPrice.compareTo(BigDecimal.ZERO) >= 0);
     }
 
+    @Test
+    void advance_n1000Iterations_neverProducesNegativePrices() throws Exception {
+        setRandomSeed(exchange, 1234L);
+
+        for (int iteration = 0; iteration < 1000; iteration++) {
+            exchange.advance();
+            assertTrue(exchange.getAllStocks().stream()
+                    .allMatch(stock -> stock.getSalesPrice().compareTo(BigDecimal.ZERO) >= 0));
+        }
+    }
+
+    @DisplayName("advance: notifies registered observers")
+    @Test
+    void advance_whenObserverIsRegistered_notifiesObserver() {
+        AtomicInteger updates = new AtomicInteger();
+        exchange.addObserver(updatedExchange -> updates.incrementAndGet());
+
+        exchange.advance();
+
+        assertEquals(1, updates.get());
+    }
+
+    @DisplayName("advance: does not notify removed observers")
+    @Test
+    void advance_whenObserverIsRemoved_doesNotNotifyObserver() {
+        AtomicInteger updates = new AtomicInteger();
+        no.ntnu.idatx2003.millions.observer.Observer<Exchange> observer =
+                updatedExchange -> updates.incrementAndGet();
+        exchange.addObserver(observer);
+        exchange.removeObserver(observer);
+
+        exchange.advance();
+
+        assertEquals(0, updates.get());
+    }
+
     @DisplayName("getGainers: returns top gainers in descending order")
     @Test
     void testGetGainers() {
@@ -169,6 +214,28 @@ class ExchangeTest {
                 () -> exchange.buy("GOOGL", new BigDecimal("10"), player));
     }
 
+    @Test
+    void buy_whenQuantityIsZero_throwsIllegalArgumentException() {
+        Player player = new Player("Trader", new BigDecimal("50000.00"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> exchange.buy("AAPL", BigDecimal.ZERO, player));
+    }
+
+    @Test
+    void buy_whenQuantityIsNegative_throwsIllegalArgumentException() {
+        Player player = new Player("Trader", new BigDecimal("50000.00"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> exchange.buy("AAPL", new BigDecimal("-1"), player));
+    }
+
+    @Test
+    void buy_whenPlayerIsNull_throwsNullPointerException() {
+        assertThrows(NullPointerException.class,
+                () -> exchange.buy("AAPL", BigDecimal.ONE, null));
+    }
+
     @DisplayName("sell: creates and commits sale transaction")
     @Test
     void testSell() throws Exception {
@@ -195,5 +262,10 @@ class ExchangeTest {
         assertEquals(0, player.getPortfolio().getShares().get(0).getQuantity().compareTo(new BigDecimal("7")));
         assertEquals(1, player.getTransactionArchive().getTransactions().size());
     }
-}
 
+    private static void setRandomSeed(Exchange exchange, long seed) throws Exception {
+        Field randomField = Exchange.class.getDeclaredField("random");
+        randomField.setAccessible(true);
+        ((Random) randomField.get(exchange)).setSeed(seed);
+    }
+}
